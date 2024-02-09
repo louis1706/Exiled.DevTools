@@ -4,27 +4,22 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using Exiled.API.Enums;
 using Exiled.API.Features;
-using Exiled.Events;
 using Exiled.Events.EventArgs.Interfaces;
-using Exiled.Events.EventArgs.Map;
-using Exiled.Events.EventArgs.Server;
 using Exiled.Events.Features;
 using HarmonyLib;
-using Utf8Json.Internal;
 
 namespace DevTools
 {
-	public sealed class DevTools : Plugin<Config>
+    public sealed class DevTools : Plugin<Config>
 	{
 		public override string Name => "DevTools";
 		public override string Author => "sanyae2439";
 		public override string Prefix => "devtools";
-		public override PluginPriority Priority => PluginPriority.Highest;
-		public override Version Version => new Version(Assembly.GetName().Version.Major, Assembly.GetName().Version.Minor, Assembly.GetName().Version.Build);
-		public override Version RequiredExiledVersion => new Version(8, 2, 0);
+		public override PluginPriority Priority => (PluginPriority)int.MaxValue-1;
+		public override Version Version => Assembly.GetName().Version;
+		public override Version RequiredExiledVersion { get; } = new Version(8, 8, 0);
 
 		public static DevTools Instance { get; private set; }
 		public Harmony Harmony { get; private set; }
@@ -62,38 +57,40 @@ namespace DevTools
 				Log.Warn($"Exiled.Events not found. Skipping AddEventHandlers.");
 				return;
 			}
-			foreach (var eventClass in EventsAssembly.Assembly.GetTypes().Where(x => x.Namespace == "Exiled.Events.Handlers"))
-				foreach (PropertyInfo propertyInfo in eventClass.GetAllProperties())
-				{
-					Delegate handler = null;
-					EventInfo eventInfo = propertyInfo.PropertyType.GetEvent("InnerEvent", (BindingFlags)(-1));
+			Log.Info($"Count Dictionary {Event<IExiledEvent>.Dictionary.Count}");
 
-					if (propertyInfo.PropertyType == typeof(Event))
-					{
-						handler = new CustomEventHandler(MessageHandlerForEmptyArgs);
+			foreach (KeyValuePair<Type, Event<IExiledEvent>> keyValuePair in Event<IExiledEvent>.Dictionary)
+            {
+				Log.Info($"TEST\nKey: {keyValuePair.Key.GetType()}\nValue: {keyValuePair.Value.GetType()}");
+                Delegate handler = typeof(DevTools)
+					.GetMethod(nameof(DevTools.MessageHandler))
+					.MakeGenericMethod(keyValuePair.Key.GetType().GenericTypeArguments)
+					.CreateDelegate(typeof(CustomEventHandler<>)
+					.MakeGenericType(keyValuePair.Key.GetType().GenericTypeArguments));
+                Log.Info($"TEST2");
 
-						MethodInfo addMethod = eventInfo.DeclaringType.GetMethod($"add_{eventInfo.Name}", BindingFlags.Instance | BindingFlags.NonPublic);
-						addMethod.Invoke(propertyInfo.GetValue(null), new object[] { handler });
-					}
-					else if (propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(Event<>))
-					{
-						handler = typeof(DevTools)
-							.GetMethod(nameof(DevTools.MessageHandler))
-							.MakeGenericMethod(eventInfo.EventHandlerType.GenericTypeArguments)
-							.CreateDelegate(typeof(CustomEventHandler<>)
-							.MakeGenericType(eventInfo.EventHandlerType.GenericTypeArguments));
+                EventInfo eventInfo = keyValuePair.Value.GetType().GetEvent("InnerEvent", (BindingFlags)(-1));
+                Log.Info($"TEST3: {eventInfo}");
 
-						MethodInfo addMethod = eventInfo.GetAddMethod(true);
-						addMethod.Invoke(propertyInfo.GetValue(null), new[] { handler });
-					}
-					else
-					{
-						Log.Warn(propertyInfo.Name);
-						continue;
-					}
+                eventInfo.GetAddMethod(true).Invoke(keyValuePair.Value, new[] { handler, });
+                Log.Info($"TEST4");
 
-					_DynamicHandlers.Add(new Tuple<EventInfo, Delegate>(eventInfo, handler));
-				}
+                _DynamicHandlers.Add(new Tuple<EventInfo, Delegate>(eventInfo, handler));
+            }
+
+            Log.Info($"Count List {Event.List.Count}");
+
+            foreach (Event @event in Event.List)
+            {
+                Delegate handler = null;
+                EventInfo eventInfo = @event.GetType().GetEvent("InnerEvent", (BindingFlags)(-1));
+
+                handler = new CustomEventHandler(MessageHandlerForEmptyArgs);
+
+				eventInfo.GetAddMethod(true).Invoke(@event, new[] { handler, });
+
+                _DynamicHandlers.Add(new Tuple<EventInfo, Delegate>(eventInfo, handler));
+            }
 
             isHandlerAdded = true;
 		}
@@ -104,7 +101,7 @@ namespace DevTools
 
             for (int i = 0; i < _DynamicHandlers.Count; i++)
 			{
-				Tuple<EventInfo, Delegate> tuple = _DynamicHandlers[i];
+				Tuple<EventInfo, Delegate> tuple = _DynamicHandlers[0];
                 EventInfo eventInfo = tuple.Item1;
                 Delegate handler = tuple.Item2;
 
@@ -231,6 +228,6 @@ namespace DevTools
 			Log.Debug(message.TrimEnd('\n'));
 		}
 
-		public static void MessageHandlerForEmptyArgs() => Log.Debug($"[    Event: {new StackFrame(2).GetMethod().Name}]");
+		public static void MessageHandlerForEmptyArgs() => Log.Debug($"[    Event: {new StackFrame(3).GetMethod().Name}]");
 	}
 }
