@@ -177,7 +177,9 @@ namespace DevTools
 					Type targetType = propertyInfo.GetValue(ev)?.GetType();
 					if(targetType == null) continue;
 
-					if(Instance.Config.LoggingIenumerables
+                    if (!Instance.Config.LoggingClassNameToNest.Contains(targetType.FullName)) continue;
+
+                    if (Instance.Config.LoggingIenumerables
 						&& propertyInfo.PropertyType.GetInterfaces().Any(t => t.IsConstructedGenericType && t.GetGenericTypeDefinition() == typeof(IEnumerable<>))
 						&& targetType.Name != nameof(System.String))
 					{
@@ -190,8 +192,6 @@ namespace DevTools
 
 						continue;
 					}
-
-					if(!Instance.Config.LoggingClassNameToNest.Contains(targetType.FullName)) continue;
 
 					if(targetType.IsClass || (targetType.IsValueType && !targetType.IsPrimitive && !targetType.IsEnum))
 					{
