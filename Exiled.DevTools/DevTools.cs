@@ -195,7 +195,7 @@ namespace DevTools
 
 					if(targetType.IsClass || (targetType.IsValueType && !targetType.IsPrimitive && !targetType.IsEnum))
 					{
-						foreach(var propertyInClass in targetType.GetProperties(_NestSearchFlags))
+						foreach(PropertyInfo propertyInClass in targetType.GetProperties(_NestSearchFlags))
 						{
 							if(propertyInClass.GetIndexParameters().Length > 0) continue;
 
@@ -209,7 +209,7 @@ namespace DevTools
 							}
 						}
 
-						foreach(var fieldInClass in targetType.GetFields(_NestSearchFlags))
+						foreach(FieldInfo fieldInClass in targetType.GetFields(_NestSearchFlags))
 						{
 							if(fieldInClass.Name.Contains("<")) continue;
 
